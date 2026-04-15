@@ -307,13 +307,13 @@ function renderResult() {
       <span style="flex:1"></span>
       <button id="copy">요약 복사</button>
     </div>
-    ${r.matches.map((m, i) => renderResultMatch(m, i)).join('')}
-    <div class="section-title">Final Settlement <span class="kr">· 세션 최종 정산 (보낼 사람 기준)</span></div>
-    <div class="result-card">
+    <div class="section-title hero">Final Settlement <span class="kr">· 세션 최종 정산</span></div>
+    <div class="result-card final">
       ${r.net.length === 0
         ? '<div class="big-zero">0원<small>정산할 친구 쌍이 없어요</small></div>'
         : renderNetGrouped(r.net)
       }
+      <div class="final-corners" aria-hidden="true"></div>
     </div>
     <div class="section-title">Personal Balance <span class="kr">· 친구별 순손익</span></div>
     <div class="result-card">
@@ -329,6 +329,8 @@ function renderResult() {
         `;
       }).join('')}
     </div>
+    <div class="section-title">Per-match Breakdown <span class="kr">· 매치별 상세</span></div>
+    ${r.matches.map((m, i) => renderResultMatch(m, i)).join('')}
     <div class="section-title">Bottom Tally <span class="kr">· 꼴등 누적</span></div>
     <div class="result-card">
       ${r.losers.map((l) => `
@@ -534,4 +536,22 @@ function render() {
   else if (state.screen === 'friends') bindFriends();
 }
 
+async function loadMe() {
+  try {
+    const me = await api('/api/me');
+    if (!me || !me.gameName) return;
+    const el = document.getElementById('brand-user');
+    const nameEl = document.getElementById('brand-user-name');
+    const tagEl = document.getElementById('brand-user-tag');
+    if (el && nameEl && tagEl) {
+      nameEl.textContent = me.gameName;
+      tagEl.textContent = me.tagLine ? `#${me.tagLine}` : '';
+      el.hidden = false;
+    }
+  } catch (e) {
+    // 조용히 실패 — 소환사 정보 못 띄워도 앱은 동작해야 함
+  }
+}
+
+loadMe();
 loadMatches();

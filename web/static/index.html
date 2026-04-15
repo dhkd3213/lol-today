@@ -74,6 +74,39 @@
     border-bottom: 1px solid var(--line-gold);
     position: relative;
   }
+  .brand-user {
+    margin-left: auto;
+    display: flex; flex-direction: column; align-items: flex-end;
+    gap: 3px;
+    padding: 9px 16px 9px 18px;
+    background: linear-gradient(180deg, rgba(22, 47, 74, 0.55), rgba(10, 20, 40, 0.3));
+    border: 1px solid var(--line);
+    border-top: 1px solid var(--gold-dim);
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+    min-width: 180px;
+    opacity: 0;
+    animation: fadeUp 0.5s ease 200ms forwards;
+  }
+  .brand-user .label {
+    font-family: "Cinzel", serif;
+    font-weight: 500;
+    font-size: 9px;
+    letter-spacing: 0.28em;
+    color: var(--gold);
+    text-transform: uppercase;
+  }
+  .brand-user .name {
+    font-family: "Nanum Myeongjo", serif;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--gold-bright);
+    letter-spacing: -0.01em;
+  }
+  .brand-user .tag {
+    color: var(--text-mid);
+    font-weight: 400;
+    margin-left: 2px;
+  }
   .brand::after {
     content: '';
     position: absolute; left: 0; right: 0; bottom: -1px;
@@ -207,8 +240,8 @@
   .match-list { display: grid; gap: 6px; }
 
   .match {
-    display: grid; grid-template-columns: 32px 100px 1fr 110px 56px 200px;
-    align-items: center; gap: 14px;
+    display: grid; grid-template-columns: 32px 100px 1fr 90px 88px 220px;
+    align-items: center; gap: 18px;
     padding: 12px 18px;
     background: linear-gradient(90deg, rgba(15, 34, 53, 0.9) 0%, rgba(10, 20, 40, 0.6) 100%);
     border: 1px solid var(--line);
@@ -318,6 +351,86 @@
   }
   .result-card::before { top: -3px; left: 24px; }
   .result-card::after { top: -3px; right: 24px; }
+
+  /* 최종 정산 전용 hero 변형 */
+  .result-card.final {
+    padding: 28px 32px 32px;
+    margin-bottom: 20px;
+    border: 1px solid var(--gold-dim);
+    border-top: 2px solid var(--gold);
+    border-bottom: 2px solid var(--gold);
+    background:
+      radial-gradient(ellipse 600px 240px at 50% 0%, rgba(200, 170, 110, 0.14), transparent 70%),
+      radial-gradient(ellipse 600px 240px at 50% 100%, rgba(10, 200, 185, 0.06), transparent 70%),
+      linear-gradient(180deg, #162f4a 0%, #0f2235 60%, #0a1428 100%);
+    box-shadow:
+      0 0 48px rgba(200, 170, 110, 0.18),
+      0 8px 32px rgba(0, 0, 0, 0.55),
+      inset 0 0 0 1px rgba(200, 170, 110, 0.08);
+    clip-path: polygon(16px 0, calc(100% - 16px) 0, 100% 16px, 100% calc(100% - 16px), calc(100% - 16px) 100%, 16px 100%, 0 calc(100% - 16px), 0 16px);
+  }
+  .result-card.final::before, .result-card.final::after {
+    width: 10px; height: 10px;
+    background: var(--gold-bright);
+    box-shadow: 0 0 10px rgba(240, 230, 210, 0.6);
+  }
+  .result-card.final::before { top: -5px; left: 32px; }
+  .result-card.final::after  { top: -5px; right: 32px; }
+  .final-corners {
+    position: absolute; bottom: -5px; left: 0; right: 0;
+    pointer-events: none;
+  }
+  .final-corners::before, .final-corners::after {
+    content: ''; position: absolute; bottom: 0;
+    width: 10px; height: 10px;
+    background: var(--gold-bright);
+    transform: rotate(45deg);
+    box-shadow: 0 0 10px rgba(240, 230, 210, 0.6);
+  }
+  .final-corners::before { left: 32px; }
+  .final-corners::after { right: 32px; }
+
+  /* 최종 정산 전용 section-title */
+  .section-title.hero {
+    font-size: 16px;
+    letter-spacing: 0.3em;
+    margin: 36px 0 16px;
+  }
+  .section-title.hero::before {
+    content: '◆';
+    color: var(--gold-bright);
+    font-size: 14px;
+    text-shadow: 0 0 10px rgba(240, 230, 210, 0.6);
+  }
+  .section-title.hero .kr {
+    font-size: 22px;
+    color: var(--gold-bright);
+    text-shadow: 0 0 20px rgba(200, 170, 110, 0.35);
+    margin-left: 8px;
+  }
+
+  /* 최종 정산 안의 net-row 강조 */
+  .result-card.final .net-group-head {
+    font-size: 17px;
+    padding: 10px 0 8px;
+  }
+  .result-card.final .net-group-head .net-group-sub {
+    font-size: 12px;
+    color: var(--gold);
+  }
+  .result-card.final .net-row {
+    padding: 9px 0;
+    font-size: 15px;
+  }
+  .result-card.final .net-row .amount {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+  .result-card.final .net-row:not(.zero) .amount {
+    color: var(--gold-bright);
+    text-shadow: 0 0 12px rgba(200, 170, 110, 0.25);
+  }
 
   .rank-row {
     display: grid;
@@ -594,6 +707,10 @@
     <div class="brand-text">
       <div class="brand-en">Howling Abyss · Ledger</div>
       <div class="brand-kr">칼바람 딜량 내기 정산소</div>
+    </div>
+    <div class="brand-user" id="brand-user" hidden>
+      <span class="label">Summoner</span>
+      <span><span class="name" id="brand-user-name"></span><span class="tag" id="brand-user-tag"></span></span>
     </div>
   </header>
   <div id="app"></div>
