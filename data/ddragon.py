@@ -2,12 +2,23 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Any
 
 import requests
 
-CACHE_DIR = Path(__file__).resolve().parent / "cache"
+
+def _writable_cache_dir() -> Path:
+    """PyInstaller 번들(읽기 전용)일 때는 %LOCALAPPDATA%/lol-today/cache 로, 개발 환경은 프로젝트 내 cache/."""
+    if getattr(sys, "frozen", False):
+        base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA") or str(Path.home())
+        return Path(base) / "lol-today" / "cache"
+    return Path(__file__).resolve().parent / "cache"
+
+
+CACHE_DIR = _writable_cache_dir()
 VERSIONS_URL = "https://ddragon.leagueoflegends.com/api/versions.json"
 CHAMPION_URL_TMPL = "https://ddragon.leagueoflegends.com/cdn/{version}/data/ko_KR/champion.json"
 ICON_URL_TMPL = "https://ddragon.leagueoflegends.com/cdn/{version}/img/champion/{key}.png"

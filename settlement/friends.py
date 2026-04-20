@@ -2,11 +2,21 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterable
 
-DEFAULT_FRIENDS_PATH = Path(__file__).resolve().parent.parent / "config" / "friends.json"
+
+def _config_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA") or str(Path.home())
+        return Path(base) / "lol-today" / "config"
+    return Path(__file__).resolve().parent.parent / "config"
+
+
+DEFAULT_FRIENDS_PATH = _config_dir() / "friends.json"
 
 
 @dataclass

@@ -35,6 +35,7 @@ from settlement import (
     upsert_friend,
 )
 
+import os
 import sys
 BASE_DIR = Path(__file__).resolve().parent
 # PyInstaller 번들 환경에서는 임시 폴더(_MEIPASS) 아래에 web/static이 위치
@@ -312,7 +313,14 @@ def settle(req: SettleRequest) -> dict[str, Any]:
 
 # ===================== SESSION HISTORY =====================
 
-HISTORY_DIR = BASE_DIR.parent / "config" / "history"
+def _history_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA") or str(Path.home())
+        return Path(base) / "lol-today" / "config" / "history"
+    return BASE_DIR.parent / "config" / "history"
+
+
+HISTORY_DIR = _history_dir()
 
 
 def _save_session(result: dict[str, Any], label: str | None) -> None:
