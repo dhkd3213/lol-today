@@ -1,0 +1,63 @@
+{
+  "name": "lol-today",
+  "version": "1.0.0",
+  "description": "LoL 칼바람 아수라장 딜량 내기 자동 정산기",
+  "author": "dhkd3213",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build:py": "pyinstaller --noconfirm --onefile --name lol-today-server --distpath dist-py --workpath build-py cli.py",
+    "build:electron": "electron-builder --win --x64",
+    "build": "npm run build:py && npm run build:electron",
+    "dist": "npm run build"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.dhkd3213.lol-today",
+    "productName": "lol-today",
+    "copyright": "© 2026 dhkd3213",
+    "directories": {
+      "output": "dist-app",
+      "buildResources": "assets"
+    },
+    "files": [
+      "electron/**/*",
+      "web/static/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist-py",
+        "to": "backend",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "data",
+        "to": "data",
+        "filter": ["cache/**/*"]
+      }
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "zip", "arch": ["x64"] }
+      ],
+      "icon": "assets/icon.ico",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDir": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "칼바람 정산기",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

@@ -47,7 +47,10 @@ def rank_friends(friends: list[dict]) -> list[RankedFriend]:
     ]
 
 
-def settle_match(ranked: list[RankedFriend]) -> tuple[list[Transfer], str | None]:
+def settle_match(
+    ranked: list[RankedFriend],
+    custom_rules: dict[int, list[tuple[int, int, int]]] | None = None,
+) -> tuple[list[Transfer], str | None]:
     """ranked: rank_friends()의 결과. returns (transfers, skip_reason)."""
     n = len(ranked)
     if n < MIN_FRIENDS:
@@ -55,7 +58,8 @@ def settle_match(ranked: list[RankedFriend]) -> tuple[list[Transfer], str | None
     if n > MAX_FRIENDS:
         return [], f"친구 {n}명 — 한 팀 상한 초과, 스킵"
 
-    rule = RULES[n]
+    table = custom_rules if custom_rules else RULES
+    rule = table.get(n, RULES[n])
     by_rank = {f.rank: f for f in ranked}
     transfers: list[Transfer] = []
     for loser_rank, winner_rank, amount in rule:

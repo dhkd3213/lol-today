@@ -40,3 +40,13 @@ def participant_riot_id(pid_entry: dict[str, Any]) -> tuple[str, str]:
 
 def participant_puuid(pid_entry: dict[str, Any]) -> str:
     return pid_entry.get("player", {}).get("puuid", "")
+
+
+def lcu_friends(client: LCUClient) -> list[dict[str, Any]]:
+    """롤 클라이언트 친구 목록 — puuid/gameName/tagLine 자동 수집용."""
+    return client.get("/lol-chat/v1/friends")
+
+
+def gameflow_phase(client: LCUClient) -> str:
+    """현재 게임 페이즈: None/Lobby/ChampSelect/InProgress/WaitingForStats/EndOfGame 등."""
+    return client.get("/lol-gameflow/v1/gameflow-phase")

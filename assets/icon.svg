@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="65%">
+      <stop offset="0%" stop-color="#1e3a5f"/>
+      <stop offset="60%" stop-color="#0a1420"/>
+      <stop offset="100%" stop-color="#000"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f0d78d"/>
+      <stop offset="50%" stop-color="#c8aa6e"/>
+      <stop offset="100%" stop-color="#8a7445"/>
+    </linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="6"/></filter>
+  </defs>
+
+  <!-- background disc -->
+  <circle cx="256" cy="256" r="248" fill="url(#bg)" stroke="#c8aa6e" stroke-width="4"/>
+
+  <!-- outer ring -->
+  <circle cx="256" cy="256" r="220" fill="none" stroke="#c8aa6e" stroke-width="1.5" stroke-opacity="0.5"/>
+
+  <!-- snowflake / abyss symbol -->
+  <g transform="translate(256,256)" stroke="url(#gold)" stroke-width="6" stroke-linecap="round" fill="none" filter="url(#glow)">
+    <line x1="0" y1="-140" x2="0" y2="140"/>
+    <line x1="-140" y1="0" x2="140" y2="0"/>
+    <line x1="-99" y1="-99" x2="99" y2="99"/>
+    <line x1="-99" y1="99" x2="99" y2="-99"/>
+  </g>
+  <g transform="translate(256,256)" stroke="url(#gold)" stroke-width="5" stroke-linecap="round" fill="none">
+    <line x1="0" y1="-140" x2="0" y2="140"/>
+    <line x1="-140" y1="0" x2="140" y2="0"/>
+    <line x1="-99" y1="-99" x2="99" y2="99"/>
+    <line x1="-99" y1="99" x2="99" y2="-99"/>
+  </g>
+
+  <!-- center coin -->
+  <circle cx="256" cy="256" r="54" fill="#0a1420" stroke="url(#gold)" stroke-width="3"/>
+  <text x="256" y="282" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="52" fill="url(#gold)">₩</text>
+
+  <!-- corner diamonds -->
+  <g fill="url(#gold)">
+    <polygon points="256,40 268,56 256,72 244,56"/>
+    <polygon points="256,440 268,456 256,472 244,456"/>
+    <polygon points="40,256 56,244 72,256 56,268"/>
+    <polygon points="440,256 456,244 472,256 456,268"/>
+  </g>
+</svg>

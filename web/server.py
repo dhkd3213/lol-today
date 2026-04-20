@@ -15,7 +15,9 @@ from data.ddragon import icon_url, load_champions
 from lcu import ClientNotRunning, LCUClient, LCURequestError
 from lcu.endpoints import (
     current_summoner,
+    gameflow_phase,
     is_aram,
+    lcu_friends,
     match_detail,
     participant_puuid,
     participant_riot_id,
@@ -33,8 +35,14 @@ from settlement import (
     upsert_friend,
 )
 
+import sys
 BASE_DIR = Path(__file__).resolve().parent
-STATIC_DIR = BASE_DIR / "static"
+# PyInstaller 번들 환경에서는 임시 폴더(_MEIPASS) 아래에 web/static이 위치
+_BUNDLE_DIR = Path(getattr(sys, "_MEIPASS", "")) if hasattr(sys, "_MEIPASS") else None
+if _BUNDLE_DIR and (_BUNDLE_DIR / "web" / "static").exists():
+    STATIC_DIR = _BUNDLE_DIR / "web" / "static"
+else:
+    STATIC_DIR = BASE_DIR / "static"
 
 app = FastAPI(title="lol-today — 칼바람 딜량 내기 정산기")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -188,8 +196,17 @@ class MatchSettlement(BaseModel):
     friends: list[FriendMember]
 
 
+class RuleEntry(BaseModel):
+    count: int          # 친구 인원수 (3/4/5)
+    loserRank: int
+    winnerRank: int
+    amount: int
+
+
 class SettleRequest(BaseModel):
     matches: list[MatchSettlement]
+    rules: list[RuleEntry] | None = None
+    label: str | None = None  # 세션 저장용 라벨 (optional)
 
 
 @app.post("/api/settle")
@@ -198,6 +215,12 @@ def settle(req: SettleRequest) -> dict[str, Any]:
     all_transfers = []
     all_friends: dict[str, str] = {}  # key → display_name (참여한 모든 친구)
     match_friend_sets: list[set[str]] = []  # 매치별 친구 key 집합 (같이 플레이한 쌍 추출용)
+
+    custom_rules: dict[int, list[tuple[int, int, int]]] | None = None
+    if req.rules:
+        custom_rules = {}
+        for r in req.rules:
+            custom_rules.setdefault(r.count, []).append((r.loserRank, r.winnerRank, r.amount))
 
     for m in req.matches:
         friends_payload = []
@@ -214,7 +237,7 @@ def settle(req: SettleRequest) -> dict[str, Any]:
             })
         match_friend_sets.append(match_keys)
         ranked = rank_friends(friends_payload)
-        transfers, skip = settle_match(ranked)
+        transfers, skip = settle_match(ranked, custom_rules=custom_rules)
         all_transfers.extend(transfers)
 
         per_match_results.append({
@@ -273,7 +296,7 @@ def settle(req: SettleRequest) -> dict[str, Any]:
     # 큰 금액 먼저, 0원은 맨 뒤
     net_rows.sort(key=lambda x: (x["amount"] == 0, -x["amount"], x["payer"]))
 
-    return {
+    result = {
         "matches": per_match_results,
         "net": net_rows,
         "perFriend": per_friend,
@@ -283,6 +306,63 @@ def settle(req: SettleRequest) -> dict[str, Any]:
         ],
         "summary": _text_summary(per_match_results, net_rows, per_friend, losers),
     }
+    _save_session(result, label=req.label)
+    return result
+
+
+# ===================== SESSION HISTORY =====================
+
+HISTORY_DIR = BASE_DIR.parent / "config" / "history"
+
+
+def _save_session(result: dict[str, Any], label: str | None) -> None:
+    try:
+        HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().astimezone()
+        fname = ts.strftime("%Y%m%d-%H%M%S") + ".json"
+        payload = {
+            "savedAt": ts.isoformat(timespec="seconds"),
+            "label": label or ts.strftime("%m/%d %H:%M 정산"),
+            "matchCount": len(result.get("matches", [])),
+            "friendCount": len(result.get("perFriend", [])),
+            "net": result.get("net", []),
+            "perFriend": result.get("perFriend", []),
+            "losers": result.get("losers", []),
+        }
+        (HISTORY_DIR / fname).write_text(
+            __import__("json").dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    except Exception:
+        # 저장 실패해도 정산 자체는 성공 — 조용히 무시
+        pass
+
+
+@app.get("/api/history")
+def list_history() -> dict[str, Any]:
+    import json
+    if not HISTORY_DIR.exists():
+        return {"sessions": []}
+    sessions = []
+    for fp in sorted(HISTORY_DIR.glob("*.json"), reverse=True)[:30]:
+        try:
+            data = json.loads(fp.read_text(encoding="utf-8"))
+            data["id"] = fp.stem
+            sessions.append(data)
+        except Exception:
+            continue
+    return {"sessions": sessions}
+
+
+@app.post("/api/history/delete")
+def delete_history(payload: dict[str, Any]) -> dict[str, Any]:
+    session_id = payload.get("id", "")
+    if not session_id:
+        raise HTTPException(status_code=400, detail="id 필요")
+    fp = HISTORY_DIR / f"{session_id}.json"
+    if fp.exists():
+        fp.unlink()
+    return {"ok": True}
 
 
 def _text_summary(per_match, net, per_friend, losers) -> str:
@@ -340,6 +420,55 @@ def add_friend(req: UpsertFriendRequest) -> dict[str, Any]:
 @app.get("/api/friends")
 def list_friends() -> dict[str, Any]:
     return {"friends": _serialize_friends(load_friends())}
+
+
+@app.get("/api/friends/lcu")
+def list_lcu_friends() -> dict[str, Any]:
+    """롤 클라이언트 친구 목록 — 풀에 없는 신규 친구만 추려서 반환."""
+    raw = _lcu_call(lcu_friends, _client)
+    pool = load_friends()
+    pool_keys = {f.puuid for f in pool if f.puuid} | {
+        f"{f.game_name}#{f.tag_line}".lower() for f in pool if f.game_name
+    }
+    candidates = []
+    for entry in raw or []:
+        puuid = entry.get("puuid", "") or ""
+        game_name = entry.get("gameName") or entry.get("name") or ""
+        tag_line = entry.get("gameTag") or entry.get("tagLine") or ""
+        if not game_name:
+            continue
+        key_id = puuid or f"{game_name}#{tag_line}".lower()
+        already = puuid in pool_keys or f"{game_name}#{tag_line}".lower() in pool_keys
+        candidates.append({
+            "puuid": puuid,
+            "gameName": game_name,
+            "tagLine": tag_line,
+            "availability": entry.get("availability", ""),
+            "alreadyAdded": already,
+            "key": key_id,
+        })
+    candidates.sort(key=lambda c: (c["alreadyAdded"], c["gameName"].lower()))
+    return {"candidates": candidates}
+
+
+class BulkImportRequest(BaseModel):
+    friends: list[UpsertFriendRequest]
+
+
+@app.post("/api/friends/import")
+def import_friends(req: BulkImportRequest) -> dict[str, Any]:
+    pool = load_friends()
+    for f in req.friends:
+        pool = upsert_friend(pool, Friend(game_name=f.gameName, tag_line=f.tagLine, puuid=f.puuid))
+    save_friends(pool)
+    return {"friends": _serialize_friends(pool), "added": len(req.friends)}
+
+
+@app.get("/api/gameflow")
+def gameflow() -> dict[str, Any]:
+    """현재 게임 페이즈 — 프론트에서 폴링해서 EndOfGame 전환 시 매치 자동 갱신."""
+    phase = _lcu_call(gameflow_phase, _client)
+    return {"phase": phase if isinstance(phase, str) else str(phase)}
 
 
 @app.post("/api/friends/delete")

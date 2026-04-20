@@ -9,6 +9,14 @@ venv/
 
 # 친구 풀 (실제 Riot ID/puuid 포함 — 개인정보)
 config/friends.json
+config/history/
+
+# Electron / PyInstaller 빌드 산출물
+node_modules/
+dist-app/
+dist-py/
+build-py/
+*.spec.bak
 
 # Data Dragon 캐시 (재다운로드 가능)
 data/cache/

@@ -558,6 +558,96 @@
     box-shadow: 0 0 0 1px rgba(200, 170, 110, 0.2);
   }
 
+  /* ==================== MODAL ==================== */
+
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  .modal {
+    background: var(--navy-1);
+    border: 1px solid var(--gold-dim);
+    border-top: 2px solid var(--gold);
+    width: min(560px, 92vw);
+    max-height: 80vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  }
+  .modal-head {
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(30, 58, 95, 0.5);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .modal-head h3 {
+    margin: 0;
+    font-family: "Cinzel", serif;
+    font-size: 16px;
+    letter-spacing: 0.15em;
+    color: var(--gold);
+    text-transform: uppercase;
+    flex: 1;
+  }
+  .modal-body {
+    padding: 12px 0;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .modal-foot {
+    padding: 12px 20px;
+    border-top: 1px solid rgba(30, 58, 95, 0.5);
+    display: flex; gap: 10px; justify-content: flex-end;
+  }
+  .lcu-friend-row {
+    display: grid; grid-template-columns: 28px 1fr auto;
+    gap: 12px; align-items: center;
+    padding: 10px 20px;
+    border-top: 1px solid rgba(30, 58, 95, 0.25);
+    cursor: pointer;
+  }
+  .lcu-friend-row:first-child { border-top: none; }
+  .lcu-friend-row:hover { background: rgba(200, 170, 110, 0.04); }
+  .lcu-friend-row.disabled { opacity: 0.35; cursor: not-allowed; }
+  .lcu-friend-row .name {
+    font-family: "Nanum Myeongjo", serif;
+    font-weight: 700;
+    color: var(--text-bright);
+  }
+  .lcu-friend-row .tag {
+    color: var(--text-mid);
+    font-size: 12px;
+    margin-left: 6px;
+  }
+  .lcu-friend-row .status {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: "JetBrains Mono", monospace;
+  }
+
+  /* ==================== LIVE INDICATOR ==================== */
+
+  .live-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px;
+    font-family: "JetBrains Mono", monospace;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .live-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--text-dim);
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+  .live-dot.ingame { background: var(--lose); box-shadow: 0 0 8px var(--lose); animation: pulse 1.6s ease-in-out infinite; }
+  .live-dot.ready  { background: var(--teal); box-shadow: 0 0 8px var(--teal); }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
   /* ==================== BALANCE & ZERO ==================== */
 
   .big-zero {
@@ -699,6 +789,134 @@
   .result-card:nth-child(3) { animation-delay: 120ms; }
   .result-card:nth-child(4) { animation-delay: 180ms; }
   .result-card:nth-child(5) { animation-delay: 240ms; }
+
+  /* ==================== EMPTY / ONBOARDING ==================== */
+
+  .empty-state {
+    padding: 64px 32px;
+    text-align: center;
+    border: 1px solid var(--line);
+    border-top: 2px solid var(--gold);
+    background: linear-gradient(180deg, var(--navy-2) 0%, var(--navy-1) 100%);
+  }
+  .empty-state .icon {
+    font-size: 44px;
+    color: var(--gold-dim);
+    margin-bottom: 18px;
+  }
+  .empty-state h3 {
+    font-family: "Cinzel", serif;
+    font-size: 20px;
+    color: var(--gold);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin: 0 0 12px;
+  }
+  .empty-state p {
+    color: var(--text-mid);
+    margin: 0 0 24px;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+  .empty-state .steps {
+    text-align: left;
+    max-width: 420px;
+    margin: 0 auto;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+  }
+  .empty-state .steps li {
+    counter-increment: step;
+    padding: 10px 0 10px 40px;
+    position: relative;
+    color: var(--text);
+    font-size: 14px;
+    border-top: 1px solid rgba(30, 58, 95, 0.3);
+  }
+  .empty-state .steps li:first-child { border-top: none; }
+  .empty-state .steps li::before {
+    content: counter(step);
+    position: absolute; left: 0; top: 10px;
+    width: 26px; height: 26px;
+    border: 1px solid var(--gold-dim);
+    color: var(--gold);
+    font-family: "Cinzel", serif;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+  }
+
+  /* ==================== RULES EDITOR ==================== */
+
+  .rules-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    padding: 16px 18px;
+  }
+  .rule-card {
+    border: 1px solid var(--line);
+    border-top: 1px solid var(--gold-dim);
+    background: var(--navy-1);
+    padding: 14px 16px;
+  }
+  .rule-card h4 {
+    margin: 0 0 10px;
+    font-family: "Cinzel", serif;
+    font-size: 13px;
+    color: var(--gold);
+    letter-spacing: 0.15em;
+  }
+  .rule-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 13px;
+    color: var(--text-mid);
+  }
+  .rule-row input {
+    width: 92px;
+    background: var(--navy-0);
+    border: 1px solid var(--line);
+    color: var(--text-bright);
+    padding: 5px 8px;
+    font-family: "JetBrains Mono", monospace;
+    text-align: right;
+    font-size: 13px;
+    outline: none;
+  }
+  .rule-row input:focus { border-color: var(--gold); }
+
+  /* ==================== HISTORY ==================== */
+
+  .history-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    gap: 14px;
+    align-items: center;
+    padding: 12px 18px;
+    border-top: 1px solid rgba(30, 58, 95, 0.3);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .history-row:first-child { border-top: none; }
+  .history-row:hover { background: rgba(200, 170, 110, 0.04); }
+  .history-row .label {
+    font-family: "Nanum Myeongjo", serif;
+    font-weight: 700;
+    color: var(--text-bright);
+  }
+  .history-row .meta {
+    color: var(--text-dim);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12px;
+  }
+  .history-row .count {
+    color: var(--gold);
+    font-size: 12px;
+    font-family: "JetBrains Mono", monospace;
+  }
 </style>
 </head>
 <body>

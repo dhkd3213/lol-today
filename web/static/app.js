@@ -1,9 +1,40 @@
-// 아주 가벼운 SPA: state → render(). 세 화면: list → prep → result.
+// 아주 가벼운 SPA: state → render(). 화면: list | prep | result | friends | rules | history.
+
+const DEFAULT_RULES = {
+  3: [{ loserRank: 3, winnerRank: 1, amount: 3000 }],
+  4: [{ loserRank: 4, winnerRank: 1, amount: 3000 }, { loserRank: 3, winnerRank: 2, amount: 1000 }],
+  5: [{ loserRank: 5, winnerRank: 1, amount: 3000 }, { loserRank: 4, winnerRank: 2, amount: 1000 }],
+};
+
+function loadRules() {
+  try {
+    const raw = localStorage.getItem('lol-today.rules');
+    if (!raw) return structuredClone(DEFAULT_RULES);
+    const parsed = JSON.parse(raw);
+    // 최소 validation
+    for (const n of [3, 4, 5]) if (!Array.isArray(parsed[n])) return structuredClone(DEFAULT_RULES);
+    return parsed;
+  } catch (_) { return structuredClone(DEFAULT_RULES); }
+}
+
+function saveRules(rules) {
+  localStorage.setItem('lol-today.rules', JSON.stringify(rules));
+}
+
+function flattenRules(rules) {
+  const out = [];
+  for (const count of [3, 4, 5]) {
+    for (const r of rules[count] || []) out.push({ count, loserRank: r.loserRank, winnerRank: r.winnerRank, amount: Number(r.amount) || 0 });
+  }
+  return out;
+}
 
 const app = document.getElementById('app');
 const state = {
-  screen: 'list',          // 'list' | 'prep' | 'result' | 'friends'
+  screen: 'list',          // 'list' | 'prep' | 'result' | 'friends' | 'rules' | 'history'
   aramOnly: true,
+  rules: loadRules(),      // 정산 금액 커스터마이징
+  history: [],             // 저장된 정산 세션 목록
   matches: [],             // from /api/matches
   selectedIds: new Set(),  // 선택한 gameId
   lastClickedId: null,     // shift+click 구간 선택용
@@ -11,6 +42,9 @@ const state = {
   result: null,            // /api/settle 응답
   friends: [],             // 친구 풀 (friend management 화면용)
   prevScreen: 'list',      // 친구 화면에서 돌아갈 때
+  lcuImport: null,         // null | { candidates: [...], picked: Set<string> }
+  gamePhase: null,         // 'None' | 'Lobby' | 'InProgress' | 'EndOfGame' ...
+  lastPhase: null,         // 직전 페이즈 — EndOfGame 전환 감지용
   error: null,
   loading: false,
 };
@@ -46,10 +80,30 @@ async function loadMatches() {
   setState({ loading: true, error: null });
   try {
     const { matches } = await api(`/api/matches?limit=50&aram_only=${state.aramOnly}`);
-    setState({ matches, loading: false });
+    setState({ matches, loading: false, clientDown: false });
   } catch (e) {
-    setState({ error: String(e.message), loading: false });
+    const msg = String(e.message);
+    const down = msg.includes('503') || msg.includes('꺼져') || msg.includes('lockfile');
+    setState({ error: down ? null : msg, clientDown: down, loading: false, matches: [] });
   }
+}
+
+function renderClientDown() {
+  return `
+    <div class="empty-state">
+      <div class="icon">⚔</div>
+      <h3>LEAGUE CLIENT OFFLINE</h3>
+      <p>롤 클라이언트가 감지되지 않아요.<br>클라이언트를 켜면 자동으로 매치가 뜹니다.</p>
+      <ol class="steps">
+        <li>League of Legends 클라이언트를 실행하세요.</li>
+        <li>로그인까지 완료되면 우측 상단 게임 상태 배지가 뜹니다.</li>
+        <li>아래 "다시 확인" 버튼을 누르거나 10초 정도 기다리면 자동으로 연결돼요.</li>
+      </ol>
+      <div style="margin-top: 28px;">
+        <button id="retry-connect">다시 확인</button>
+      </div>
+    </div>
+  `;
 }
 
 function dmgBar(damage, maxDamage, rank, total) {
@@ -79,6 +133,9 @@ function renderList() {
       <button class="ghost" id="select-yesterday">어제</button>
       <button class="ghost" id="select-today">오늘</button>
       <span style="flex:1"></span>
+      ${renderLiveBadge()}
+      <button class="ghost" id="open-rules">룰 설정</button>
+      <button class="ghost" id="open-history">정산 기록</button>
       <button class="ghost" id="manage-friends">친구 관리</button>
       <button class="ghost" id="refresh">새로고침</button>
       <button id="next" ${selCount < 1 ? 'disabled' : ''}>선택한 ${selCount}판 정산 준비</button>
@@ -88,6 +145,17 @@ function renderList() {
       ${state.matches.map((m) => renderMatchRow(m, maxMyDmg)).join('')}
     </div>
   `;
+}
+
+function renderLiveBadge() {
+  const phase = state.gamePhase;
+  if (!phase || phase === 'None' || phase === 'Lobby') return '';
+  let cls = '', label = phase;
+  if (phase === 'InProgress') { cls = 'ingame'; label = '인게임'; }
+  else if (phase === 'EndOfGame' || phase === 'WaitingForStats' || phase === 'PreEndOfGame') { cls = 'ready'; label = '게임 종료'; }
+  else if (phase === 'ChampSelect') { cls = 'ingame'; label = '챔프 선택'; }
+  else return '';
+  return `<span class="live-badge"><span class="live-dot ${cls}"></span>${label}</span>`;
 }
 
 function isSameLocalDay(ts, ref) {
@@ -123,6 +191,8 @@ function bindList() {
   document.getElementById('refresh')?.addEventListener('click', loadMatches);
   document.getElementById('next')?.addEventListener('click', goToPrep);
   document.getElementById('manage-friends')?.addEventListener('click', goToFriends);
+  document.getElementById('open-rules')?.addEventListener('click', () => setState({ screen: 'rules', prevScreen: 'list' }));
+  document.getElementById('open-history')?.addEventListener('click', goToHistory);
 
   document.getElementById('select-all')?.addEventListener('click', () => {
     const allSelected = state.matches.every((m) => state.selectedIds.has(m.gameId));
@@ -288,6 +358,7 @@ async function runSettle() {
             damage: t.damage,
           })),
       })),
+      rules: flattenRules(state.rules),
     };
     const result = await api('/api/settle', { method: 'POST', body: JSON.stringify(payload) });
     setState({ result, screen: 'result', loading: false });
@@ -420,7 +491,10 @@ function renderFriends() {
     <div class="toolbar">
       <button class="ghost" id="friends-back">← 돌아가기</button>
       <span class="muted">친구 풀 (${state.friends.length}명)</span>
+      <span style="flex:1"></span>
+      <button id="import-lcu">롤 친구에서 가져오기</button>
     </div>
+    ${renderImportModal()}
     <div class="result-card" style="padding: 0;">
       ${state.friends.length === 0
         ? '<div class="muted" style="padding: 20px; text-align: center;">아직 등록된 친구가 없어요. 매치 정산 화면에서 "+ 친구풀" 버튼으로 추가하거나 아래에서 직접 추가하세요.</div>'
@@ -459,10 +533,101 @@ function renderFriendRow(f) {
   `;
 }
 
+function renderImportModal() {
+  if (!state.lcuImport) return '';
+  const { candidates, picked } = state.lcuImport;
+  const available = candidates.filter((c) => !c.alreadyAdded);
+  const added = candidates.filter((c) => c.alreadyAdded);
+  const canSubmit = picked.size > 0;
+  const row = (c) => {
+    const isPicked = picked.has(c.key);
+    const disabled = c.alreadyAdded ? 'disabled' : '';
+    return `
+      <div class="lcu-friend-row ${disabled}" data-lcu-key="${escapeHtml(c.key)}">
+        <input type="checkbox" ${isPicked ? 'checked' : ''} ${c.alreadyAdded ? 'disabled' : ''}>
+        <div>
+          <span class="name">${escapeHtml(c.gameName)}</span>
+          <span class="tag">${c.tagLine ? '#' + escapeHtml(c.tagLine) : ''}</span>
+        </div>
+        <span class="status">${c.alreadyAdded ? '이미 추가됨' : (c.availability || '')}</span>
+      </div>
+    `;
+  };
+  return `
+    <div class="modal-backdrop" id="import-backdrop">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-head">
+          <h3>롤 클라이언트 친구</h3>
+          <span class="muted" style="font-size: 12px;">${available.length}명 신규 · ${added.length}명 이미 추가됨</span>
+        </div>
+        <div class="modal-body">
+          ${candidates.length === 0
+            ? '<div class="muted" style="padding: 28px; text-align:center;">롤 친구 목록이 비어있거나 불러올 수 없습니다.</div>'
+            : available.map(row).join('') + added.map(row).join('')
+          }
+        </div>
+        <div class="modal-foot">
+          <button class="ghost" id="import-cancel">취소</button>
+          <button id="import-submit" ${canSubmit ? '' : 'disabled'}>${picked.size}명 추가</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function openImportModal() {
+  setState({ loading: true, error: null });
+  try {
+    const { candidates } = await api('/api/friends/lcu');
+    setState({ lcuImport: { candidates, picked: new Set() }, loading: false });
+  } catch (e) {
+    setState({ error: String(e.message), loading: false });
+  }
+}
+
+function bindImportModal() {
+  if (!state.lcuImport) return;
+  document.getElementById('import-backdrop')?.addEventListener('click', (e) => {
+    if (e.target.id === 'import-backdrop') setState({ lcuImport: null });
+  });
+  document.getElementById('import-cancel')?.addEventListener('click', () => {
+    setState({ lcuImport: null });
+  });
+  document.querySelectorAll('[data-lcu-key]').forEach((row) => {
+    row.addEventListener('click', (e) => {
+      const key = row.dataset.lcuKey;
+      const cand = state.lcuImport.candidates.find((c) => c.key === key);
+      if (!cand || cand.alreadyAdded) return;
+      const picked = new Set(state.lcuImport.picked);
+      if (picked.has(key)) picked.delete(key);
+      else picked.add(key);
+      setState({ lcuImport: { ...state.lcuImport, picked } });
+    });
+  });
+  document.getElementById('import-submit')?.addEventListener('click', async () => {
+    const { candidates, picked } = state.lcuImport;
+    const toAdd = candidates
+      .filter((c) => picked.has(c.key) && !c.alreadyAdded)
+      .map((c) => ({ puuid: c.puuid, gameName: c.gameName, tagLine: c.tagLine }));
+    try {
+      await api('/api/friends/import', {
+        method: 'POST',
+        body: JSON.stringify({ friends: toAdd }),
+      });
+      const { friends } = await api('/api/friends');
+      setState({ friends, lcuImport: null, error: null });
+    } catch (e) {
+      setState({ error: String(e.message) });
+    }
+  });
+}
+
 function bindFriends() {
   document.getElementById('friends-back')?.addEventListener('click', () => {
     setState({ screen: state.prevScreen || 'list' });
   });
+  document.getElementById('import-lcu')?.addEventListener('click', openImportModal);
+  bindImportModal();
   document.getElementById('new-add')?.addEventListener('click', async () => {
     const name = document.getElementById('new-name').value.trim();
     const tag = document.getElementById('new-tag').value.trim();
@@ -523,17 +688,140 @@ function render() {
   if (state.loading) body = '<div class="muted">불러오는 중…</div>';
   else if (state.error) body = `<div class="error">${escapeHtml(state.error)}</div>`;
 
-  if (state.screen === 'list') body = body + renderList();
+  if (state.screen === 'list' && state.clientDown) body = renderClientDown();
+  else if (state.screen === 'list') body = body + renderList();
   else if (state.screen === 'prep') body = body + renderPrep();
   else if (state.screen === 'result') body = body + renderResult();
   else if (state.screen === 'friends') body = body + renderFriends();
+  else if (state.screen === 'rules') body = body + renderRules();
+  else if (state.screen === 'history') body = body + renderHistory();
 
   app.innerHTML = body;
 
-  if (state.screen === 'list') bindList();
+  if (state.screen === 'list' && state.clientDown) document.getElementById('retry-connect')?.addEventListener('click', loadMatches);
+  else if (state.screen === 'list') bindList();
   else if (state.screen === 'prep') bindPrep();
   else if (state.screen === 'result') bindResult();
   else if (state.screen === 'friends') bindFriends();
+  else if (state.screen === 'rules') bindRules();
+  else if (state.screen === 'history') bindHistory();
+}
+
+// ---------------- rules screen ----------------
+
+function renderRules() {
+  const card = (count) => {
+    const rows = state.rules[count] || [];
+    return `
+      <div class="rule-card">
+        <h4>${count}인 룰</h4>
+        ${rows.map((r, i) => `
+          <div class="rule-row">
+            <span>${r.loserRank}등 → ${r.winnerRank}등</span>
+            <input type="number" min="0" step="500" data-count="${count}" data-idx="${i}" value="${r.amount}"> 원
+          </div>
+        `).join('')}
+      </div>
+    `;
+  };
+  return `
+    <div class="toolbar">
+      <button class="ghost" id="rules-back">← 돌아가기</button>
+      <span class="muted">정산 금액 설정</span>
+      <span style="flex:1"></span>
+      <button class="ghost" id="rules-reset">기본값으로</button>
+    </div>
+    <div class="result-card" style="padding: 0;">
+      <div class="rules-grid">
+        ${card(3)}
+        ${card(4)}
+        ${card(5)}
+      </div>
+      <div class="muted" style="padding: 0 18px 16px; font-size: 12px;">
+        값은 자동 저장됨. 이 브라우저에만 저장되니 친구한테 앱 전달 시 각자 본인 룰로 쓸 수 있음.
+      </div>
+    </div>
+  `;
+}
+
+function bindRules() {
+  document.getElementById('rules-back')?.addEventListener('click', () => setState({ screen: state.prevScreen || 'list' }));
+  document.getElementById('rules-reset')?.addEventListener('click', () => {
+    if (!confirm('기본값(3000/1000원)으로 되돌릴까요?')) return;
+    const fresh = structuredClone(DEFAULT_RULES);
+    saveRules(fresh);
+    setState({ rules: fresh });
+  });
+  document.querySelectorAll('input[data-count]').forEach((inp) => {
+    inp.addEventListener('change', () => {
+      const count = Number(inp.dataset.count);
+      const idx = Number(inp.dataset.idx);
+      const v = Math.max(0, parseInt(inp.value, 10) || 0);
+      const rules = structuredClone(state.rules);
+      rules[count][idx].amount = v;
+      saveRules(rules);
+      setState({ rules });
+    });
+  });
+}
+
+// ---------------- history screen ----------------
+
+async function goToHistory() {
+  setState({ loading: true, error: null, prevScreen: state.screen });
+  try {
+    const { sessions } = await api('/api/history');
+    setState({ history: sessions, screen: 'history', loading: false });
+  } catch (e) {
+    setState({ error: String(e.message), loading: false });
+  }
+}
+
+function renderHistory() {
+  return `
+    <div class="toolbar">
+      <button class="ghost" id="history-back">← 돌아가기</button>
+      <span class="muted">정산 기록 (${state.history.length}건)</span>
+    </div>
+    <div class="result-card" style="padding: 0;">
+      ${state.history.length === 0
+        ? '<div class="muted" style="padding: 48px; text-align:center;">아직 저장된 정산 기록이 없어요. 정산을 한 번 실행하면 여기에 자동 저장됩니다.</div>'
+        : state.history.map(renderHistoryRow).join('')
+      }
+    </div>
+  `;
+}
+
+function renderHistoryRow(s) {
+  const when = s.savedAt ? s.savedAt.replace('T', ' ').slice(0, 16) : '';
+  const topPayer = (s.perFriend || []).filter((f) => f.net < 0).sort((a, b) => a.net - b.net)[0];
+  const tag = topPayer ? `· ${escapeHtml(topPayer.name)}가 ${fmt(-topPayer.net)}원 지출` : '';
+  return `
+    <div class="history-row" data-history-id="${escapeHtml(s.id)}">
+      <div>
+        <div class="label">${escapeHtml(s.label || '정산')}</div>
+        <div class="meta">${when} ${tag}</div>
+      </div>
+      <div class="count">${s.matchCount}판</div>
+      <div class="count">${s.friendCount}명</div>
+      <button class="danger" data-del-history="${escapeHtml(s.id)}">삭제</button>
+    </div>
+  `;
+}
+
+function bindHistory() {
+  document.getElementById('history-back')?.addEventListener('click', () => setState({ screen: state.prevScreen || 'list' }));
+  document.querySelectorAll('button[data-del-history]').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!confirm('이 정산 기록을 삭제할까요?')) return;
+      try {
+        await api('/api/history/delete', { method: 'POST', body: JSON.stringify({ id: btn.dataset.delHistory }) });
+        const { sessions } = await api('/api/history');
+        setState({ history: sessions });
+      } catch (err) { setState({ error: String(err.message) }); }
+    });
+  });
 }
 
 async function loadMe() {
@@ -553,5 +841,22 @@ async function loadMe() {
   }
 }
 
+async function pollGameflow() {
+  try {
+    const { phase } = await api('/api/gameflow');
+    const prev = state.lastPhase;
+    const endedNow = prev === 'InProgress' && (phase === 'WaitingForStats' || phase === 'EndOfGame' || phase === 'PreEndOfGame' || phase === 'None');
+    setState({ gamePhase: phase, lastPhase: phase });
+    if (endedNow && state.screen === 'list') {
+      // 게임이 막 끝남 → 잠시 후 매치 히스토리 자동 갱신 (LCU가 기록 반영하는 시간 고려)
+      setTimeout(loadMatches, 4000);
+    }
+  } catch (e) {
+    // 클라이언트 꺼져있을 수 있음 — 조용히 무시
+  }
+}
+
+setInterval(pollGameflow, 8000);
+pollGameflow();
 loadMe();
 loadMatches();
