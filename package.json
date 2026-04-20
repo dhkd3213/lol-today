@@ -7,7 +7,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "build:py": "pyinstaller --noconfirm --onefile --name lol-today-server --distpath dist-py --workpath build-py cli.py",
+    "build:py": "pyinstaller --noconfirm --distpath dist-py --workpath build-py lol-today.spec",
     "build:electron": "electron-builder --win --x64",
     "build": "npm run build:py && npm run build:electron",
     "dist": "npm run build"
@@ -47,11 +47,12 @@
         { "target": "zip", "arch": ["x64"] }
       ],
       "icon": "assets/icon.ico",
+      "signAndEditExecutable": false,
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDir": true,
+      "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "칼바람 정산기",

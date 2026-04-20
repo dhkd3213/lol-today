@@ -35,6 +35,9 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+import os as _os
+_os.makedirs('dist-py', exist_ok=True)
+
 exe = EXE(
     pyz,
     a.scripts,
